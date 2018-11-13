@@ -3,5 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/TobiiProGlasses2_PyCtrl" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/TobiiProGlasses2_PyCtrl/TobiiProGlasses2_PyCtrl_tmp" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/TobiiProGlasses2_PyCtrl_tmp" vcs="Git" />
   </component>
 </project>

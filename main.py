@@ -67,6 +67,7 @@ cap = cv2.VideoCapture("rtsp://%s:8554/live/scene" % tobiiglasses.get_address())
 if (cap.isOpened()== False):
     print("Error opening video stream or file")
 
+
 # Read until video is completed
 while(cap.isOpened()):
   # Capture frame-by-frame
@@ -77,8 +78,11 @@ while(cap.isOpened()):
     data_gp  = tobiiglasses.get_data()['gp']
     data_pts = tobiiglasses.get_data()['pts']
     offset = data_gp['ts']/1000000.0 - data_pts['ts']/1000000.0
-    if offset > 0.0 and offset <= frame_duration:
-        cv2.circle(frame,(int(data_gp['gp'][0]*width),int(data_gp['gp'][1]*height)), 30, (0,0,255), 2)
+
+    print(offset)
+
+    #if offset > 0.0 and offset <= frame_duration:
+    cv2.circle(frame,(int(data_gp['gp'][0]*width),int(data_gp['gp'][1]*height)), 30, (0,0,255), 2)
     # Display the resulting frame
     cv2.imshow('Tobii Pro Glasses 2 - Live Scene',frame)
 
