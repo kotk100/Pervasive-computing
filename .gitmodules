@@ -1,0 +1,3 @@
+[submodule "TobiiProGlasses2_PyCtrl"]
+	path = TobiiProGlasses2_PyCtrl
+	url = https://github.com/ddetommaso/TobiiProGlasses2_PyCtrl.git
