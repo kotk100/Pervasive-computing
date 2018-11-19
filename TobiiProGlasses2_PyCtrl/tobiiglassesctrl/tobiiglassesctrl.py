@@ -27,6 +27,9 @@ import struct
 import sys
 import netifaces
 import select
+from collections import deque
+from queue import Queue
+from queue import Empty
 
 
 socket.IPPROTO_IPV6 = 41
@@ -36,7 +39,7 @@ log.basicConfig(format='[%(levelname)s]: %(message)s', level=log.DEBUG)
 
 class TobiiGlassesController():
 
-	def __init__(self, address = None, video_scene = False):
+	def __init__(self, detected_blink_queue, address = None, video_scene = False):
 		self.timeout = 1
 		self.streaming = False
 		self.video_scene = video_scene
@@ -52,6 +55,13 @@ class TobiiGlassesController():
 		self.data['gp'] = nd
 		self.data['gp3'] = nd
 		self.data['pts'] = nd
+		self.data['vts'] = nd
+
+		self.tracking_queue = {}
+		self.tracking_queue['left'] = deque(maxlen=3)
+		self.tracking_queue['right'] = deque(maxlen=3)
+		self.blink_queue = Queue()
+		self.blink_filtered = detected_blink_queue
 
 		self.project_id = str(uuid.uuid4())
 		self.project_name = "TobiiProGlasses PyController"
@@ -113,13 +123,12 @@ class TobiiGlassesController():
 			time.sleep(self.timeout)
 
 
-	def __grab_data__(self, socket):
+	def __grab_data__(self, socket): # TODO received tracking data
 		time.sleep(1)
 		while self.streaming:
 			data, address = socket.recvfrom(1024)
 			jdata = json.loads(data)
 			self.__refresh_data__(jdata)
-
 
 
 	def __refresh_data__(self, jsondata):
@@ -144,6 +153,8 @@ class TobiiGlassesController():
 			ts = jsondata['ts']
 			eye = jsondata['eye']
 			if( (self.data[eye + '_eye']['pc']['ts'] < ts) and (jsondata['s'] == 0) ):
+				# Send pupil centre data to function for blink detection TODO seperate thread?
+				self.__blink_detection__(jsondata)
 				self.data[eye + '_eye']['pc'] = jsondata
 		except:
 			pass
@@ -199,18 +210,28 @@ class TobiiGlassesController():
 		except:
 			pass
 
+		try:
+			pts = jsondata['vts']
+			ts = jsondata['ts']
+			if( (self.data['vts']['ts'] < ts) and (jsondata['s'] == 0) ):
+				self.data['vts'] = jsondata
+		except:
+			pass
+
 
 	def __start_streaming__(self):
 		try:
 			self.streaming = True
 			self.td = threading.Timer(0, self.__send_keepalive_msg__, [self.data_socket, self.KA_DATA_MSG])
 			self.tg = threading.Timer(0, self.__grab_data__, [self.data_socket])
+			self.tb = threading.Timer(0, self.__pocess_blinks__)
 			if self.video_scene:
 				self.tv = threading.Timer(0, self.__send_keepalive_msg__, [self.video_socket, self.KA_VIDEO_MSG])
 				self.tv.start()
 				log.debug("Video streaming started...")
 			self.td.start()
 			self.tg.start()
+			self.tb.start()
 			log.debug("Data streaming started...")
 		except:
 			self.streaming = False
@@ -312,6 +333,7 @@ class TobiiGlassesController():
 				self.streaming = False
 				self.td.join()
 				self.tg.join()
+				self.tb.join()
 				if self.video_scene:
 					self.tv.join()
 			log.debug("Data streaming successful stopped!")
@@ -448,7 +470,7 @@ class TobiiGlassesController():
 	def create_recording(self, participant_id, recording_notes = ""):
 		self.recn = self.recn + 1
 		recording_name = "Recording" + str(self.recn)
-		data = {'rec_participant': participant_id, 'rec_info': {'EagleId': str(uuid.uuid5(uuid.NAMESPACE_DNS, self.participant_name.encode('utf-8'))), 'Name': recording_name, 'Notes': recording_notes}}
+		data = {'rec_participant': participant_id, 'rec_info': {'EagleId': str(uuid.uuid5(uuid.NAMESPACE_DNS, str(self.participant_name.encode('utf-8')))), 'Name': recording_name, 'Notes': recording_notes}}
 		json_data = self.__post_request__('/api/recordings', data)
 		return json_data['rec_id']
 
@@ -493,3 +515,52 @@ class TobiiGlassesController():
 	def set_video_freq_50(self):
 		data = {'sys_sc_fps': 50}
 		json_data = self.__post_request__('/api/system/conf/', data)
+
+
+	# Process incoming tracking data to detect blinking
+	# Only the pupil center data is used, pupil diameter could also be used, but it is not needed
+	def __blink_detection__(self, jsondata):
+		eye = jsondata['eye']
+		ts = jsondata['ts']
+
+		# Get last point if present in queue
+		try:
+			last_point = self.tracking_queue[eye][0]
+		except:
+			pass
+
+		# Save new point in queue
+		self.tracking_queue[eye].appendleft(jsondata)
+
+		try:
+			# If no data for ~3 tracking points a blink (no eye) was detected, one tracking point is received per ~20ms
+			diff_last = (ts - last_point['ts']) / 1000000.0
+			if diff_last > 0.06:
+				# Send blink detection to other thread for processing
+				self.blink_queue.put(jsondata)
+		except:
+			pass
+
+	# Processes detected blinks and writes the detected blinks into the queue passed at initialization time
+	def __pocess_blinks__(self):
+		while self.streaming:
+			# Read detected blink or block until available
+			val = self.blink_queue.get()
+			last_blink_eye = val['eye']
+			#print("blink detected in %s eye at %d" % (last_blink_eye, val['ts']))
+
+			try:
+				# Timeout after 45ms if no other blink is detected in that time
+				val = self.blink_queue.get(True, 0.045)
+
+				# if a blink is detected that close to another check if it's from a different eye and consider it as blinking with both eyes
+				# The timeout value provides a tradeoff between fast response when blinking with one eye and amount of errors when using both (seperate detections)
+				if ((last_blink_eye == 'right') & (val['eye'] == 'left')) | ((last_blink_eye == 'left') & (val['eye'] == 'right')):
+					self.blink_filtered.put('both')
+					print("Blink detected in both eyes")
+				else:
+					print("Error-ish, shouldn't happen in real-world, do you have super powers and can blink really fast?")
+			except Empty:
+				# If no other blink is reveived in the 40ms output the detected blink as just a single eye blink
+				self.blink_filtered.put(last_blink_eye)
+				print("Blink detected in %s eye" % last_blink_eye)
