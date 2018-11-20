@@ -36,7 +36,7 @@ try:
     import glib
     import gst
 except ImportError:
-    print "Please make sure you have glib and gst python integration installed"
+    print("Please make sure you have glib and gst python integration installed")
     raise
 
 
@@ -256,7 +256,7 @@ class Video():
 if __name__=="__main__":
     import sys
     if len(sys.argv) <= 1:
-        print "Use %s [host|ip]" % sys.argv[0]
+        print("Use %s [host|ip]" % sys.argv[0])
         exit(1)
     glib.threads_init()
     ml = glib.MainLoop();

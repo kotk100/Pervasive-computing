@@ -79,7 +79,10 @@ while(cap.isOpened()):
     data_pts = tobiiglasses.get_data()['pts']
     offset = data_gp['ts']/1000000.0 - data_pts['ts']/1000000.0
 
-    print(offset)
+    x = data_gp["gp"][0]
+    y = data_gp["gp"][1]
+    print(x, y)
+
 
     #if offset > 0.0 and offset <= frame_duration:
     cv2.circle(frame,(int(data_gp['gp'][0]*width),int(data_gp['gp'][1]*height)), 30, (0,0,255), 2)
