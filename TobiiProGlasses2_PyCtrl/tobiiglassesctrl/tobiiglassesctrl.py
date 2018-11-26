@@ -60,6 +60,7 @@ class TobiiGlassesController():
 		self.tracking_queue = {}
 		self.tracking_queue['left'] = deque(maxlen=3)
 		self.tracking_queue['right'] = deque(maxlen=3)
+		self.tracking_queue['gp'] = deque(maxlen=3)
 		self.blink_queue = Queue()
 		self.blink_filtered = detected_blink_queue
 
@@ -181,6 +182,7 @@ class TobiiGlassesController():
 			gp = jsondata['gp']
 			ts = jsondata['ts']
 			if( (self.data['gp']['ts'] < ts) and (jsondata['s'] == 0) ):
+				self.tracking_queue['gp'].appendleft(jsondata)
 				self.data['gp'] = jsondata
 
 		except:
@@ -536,6 +538,8 @@ class TobiiGlassesController():
 			# If no data for ~3 tracking points a blink (no eye) was detected, one tracking point is received per ~20ms
 			diff_last = (ts - last_point['ts']) / 1000000.0
 			if diff_last > 0.06:
+				# Get the estimated gp from last 2 measurements before blink
+				jsondata['gp'] = [(self.tracking_queue['gp'][1]['gp'][0] + self.tracking_queue['gp'][2]['gp'][0])/2, (self.tracking_queue['gp'][1]['gp'][1] + self.tracking_queue['gp'][2]['gp'][1])/2]
 				# Send blink detection to other thread for processing
 				self.blink_queue.put(jsondata)
 		except:
@@ -547,6 +551,7 @@ class TobiiGlassesController():
 			# Read detected blink or block until available
 			val = self.blink_queue.get()
 			last_blink_eye = val['eye']
+			gp = val['gp']
 			#print("blink detected in %s eye at %d" % (last_blink_eye, val['ts']))
 
 			try:
@@ -556,11 +561,11 @@ class TobiiGlassesController():
 				# if a blink is detected that close to another check if it's from a different eye and consider it as blinking with both eyes
 				# The timeout value provides a tradeoff between fast response when blinking with one eye and amount of errors when using both (seperate detections)
 				if ((last_blink_eye == 'right') & (val['eye'] == 'left')) | ((last_blink_eye == 'left') & (val['eye'] == 'right')):
-					self.blink_filtered.put('both')
+					self.blink_filtered.put({'eye': 'both', 'gp': gp})
 					print("Blink detected in both eyes")
 				else:
 					print("Error-ish, shouldn't happen in real-world, do you have super powers and can blink really fast?")
 			except Empty:
 				# If no other blink is reveived in the 40ms output the detected blink as just a single eye blink
-				self.blink_filtered.put(last_blink_eye)
+				self.blink_filtered.put({'eye': last_blink_eye, 'gp': gp})
 				print("Blink detected in %s eye" % last_blink_eye)
