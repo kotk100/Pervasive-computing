@@ -21,6 +21,7 @@ import sys
 import time
 from queue import Queue
 from queue import Empty
+from ColorRecognition import getColorFromImage
 from TobiiProGlasses2_PyCtrl.tobiiglassesctrl.tobiiglassesctrl import TobiiGlassesController
 
 # Create queue for receiving detected blinks
@@ -113,6 +114,9 @@ while (cap.isOpened()):
 				cv2.circle(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), 30, (0, 0, 255), -1)
 			elif blink == 'left':
 				cv2.ellipse(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), (30, 30), 0, 90, 270, (0, 0, 255), -1)
+				image = getColorFromImage.ImageProcessor(frame)
+				print(image.get_avg_pixel_color())
+				image.show_result()
 			elif blink == 'right':
 				cv2.ellipse(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), (30, 30), 0, -90, 90, (0, 0, 255), -1)
 			blink_display_frames -= 1

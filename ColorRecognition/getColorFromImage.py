@@ -4,7 +4,8 @@ import cv2
 
 class ImageProcessor:
     def __init__(self, image_path):
-        self.img = cv2.imread(image_path)
+        # self.img = cv2.imread(image_path)
+        self.img = image_path
         self.gray_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
 
         # pixels that have lower value than 245 turns into black, others to white (higher number -> smaller area)
@@ -63,13 +64,14 @@ class ImageProcessor:
             "blue": [0, 0, 255],
             "yellow": [255, 255, 0],
             "purple": [255, 0, 255],
-            "orange": [255, 128, 0]
+            "orange": [255, 128, 0],
+            "white": [255, 255, 255]
         }
-        distances = {k: self.get_manhattan_distance(v, rgb) for k, v in colors.items()}
+        distances = {k: self._get_manhattan_distance(v, rgb) for k, v in colors.items()}
         color = min(distances, key=distances.get)
         return color
 
-    def get_manhattan_distance(self, x, y):
+    def _get_manhattan_distance(self, x, y):
         return abs(x[0] - y[0]) + abs(x[1] - y[1]) + abs(x[2] - y[2])
 
 
