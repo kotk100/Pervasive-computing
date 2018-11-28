@@ -6,3 +6,5 @@
 
 `python -m pip install numpy`
 
+`pip install beautifultable`
+

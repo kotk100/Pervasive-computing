@@ -41,11 +41,11 @@ if tobiiglasses.is_recording():
 	rec_id = tobiiglasses.get_current_recording_id()
 	tobiiglasses.stop_recording(rec_id)
 
-project_name = input("Please insert the project's name: ")
-project_id = tobiiglasses.create_project(project_name)
+#project_name = input("Please insert the project's name: ")
+project_id = tobiiglasses.create_project("")
 
-participant_name = input("Please insert the participant's name: ")
-participant_id = tobiiglasses.create_participant(project_id, participant_name)
+#participant_name = input("Please insert the participant's name: ")
+participant_id = tobiiglasses.create_participant(project_id, "")
 
 calibration_id = tobiiglasses.create_calibration(project_id, participant_id)
 
@@ -65,7 +65,7 @@ print(video_freq)
 
 frame_duration = 1000.0 / float(video_freq)  # frame duration in ms
 
-input("Press ENTER to start the video scene")
+# input("Press ENTER to start the video scene")
 
 # Only works on wireless/ipv4 for some reason
 cap = cv2.VideoCapture("rtsp://%s:8554/live/scene" % tobiiglasses.get_address())
@@ -82,7 +82,7 @@ if (cap.isOpened() == False):
 # tobiiglasses.send_event("start_recording", "Start of the recording ")
 
 # Read until video is completed
-
+counter = 0
 while (cap.isOpened()):
 	# Capture frame-by-frame
 	ret, frame = cap.read()
@@ -92,16 +92,19 @@ while (cap.isOpened()):
 		try:
 			blink = detected_blinks.get_nowait()
 			# Number of frames to display the blink
-			blink_display_frames = 7
+			blink_display_frames = 1
 		except Empty:
 			break
 
 	if ret == True:
 
 		height, width = frame.shape[:2]
-		data_gp = tobiiglasses.get_data()['gp']
+		if 'blink' in locals():
+			data_gp = blink['gp']
+		else:
+			data_gp = tobiiglasses.get_data()['gp']['gp']
 		data_pts = tobiiglasses.get_data()['pts']  # TODO not receiving PTS sync packets for some reason
-		offset = data_gp['ts'] / 1000000.0 - data_pts['ts'] / 1000000.0  # offset in ms
+		#offset = data_gp['ts'] / 1000000.0 - data_pts['ts'] / 1000000.0  # offset in ms
 
 		# Seconds after video start, used for sync
 		pst = cap.get(cv2.CAP_PROP_POS_MSEC)
@@ -109,27 +112,37 @@ while (cap.isOpened()):
 
 		# if offset > 0.0 and offset <= frame_duration:
 		# Display detected blinks by filling the appropriate part of circle for blink_display_frames number of frames
+		x = int(data_gp[0] * width)
+		y = int(data_gp[1] * height)
 		if 'blink' in locals():
-			if blink == 'both':
-				cv2.circle(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), 30, (0, 0, 255), -1)
-			elif blink == 'left':
-				cv2.ellipse(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), (30, 30), 0, 90, 270, (0, 0, 255), -1)
-				image = getColorFromImage.ImageProcessor(frame)
+			if blink['eye'] == 'both':
+				cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), -1)
+			elif blink['eye'] == 'left':
+				x1 = max(0, x-150)
+				x2 = min(width, x +150)
+				y1 = max(0, y-150)
+				y2 = min(height, y+150)
+				light = frame[y1:y2, x1:x2]
+				cv2.imshow(str(counter), light)
+				cv2.imwrite("ColorRecognition/TestImages/" + str(counter)+".jpg", light)
+				image = getColorFromImage.ImageProcessor(light)
 				print(image.get_avg_pixel_color())
-				image.show_result()
-			elif blink == 'right':
-				cv2.ellipse(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), (30, 30), 0, -90, 90, (0, 0, 255), -1)
+				counter += 1
+				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, 90, 270, (0, 0, 255), -1)
+			elif blink['eye'] == 'right':
+				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, -90, 90, (0, 0, 255), -1)
 			blink_display_frames -= 1
 			if blink_display_frames < 1:
-				blink = ''
+				del blink
 
-		cv2.circle(frame, (int(data_gp['gp'][0] * width), int(data_gp['gp'][1] * height)), 30, (0, 0, 255), 2)
+		cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), 2)
 		# Display the resulting frame
 		cv2.imshow('Tobii Pro Glasses 2 - Live Scene', frame)
 
 		# Press Q on keyboard to  exit
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			break
+
 
 	# Break the loop
 	else:
