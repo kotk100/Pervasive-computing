@@ -12,7 +12,7 @@ class ImageProcessor:
 
         # pixels that have lower value than 245 turns into black, others to white (higher number -> smaller area)
         # Image is gray scale so its values are form 0 (black) to 255 (white)
-        _, self.direct_light = cv2.threshold(self.gray_img, 245, 255, cv2.THRESH_BINARY)
+        _, self.direct_light = cv2.threshold(self.gray_img, 220, 255, cv2.THRESH_BINARY)
         M = cv2.moments(self.direct_light)
         try:
             self.lighting_center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
@@ -20,7 +20,7 @@ class ImageProcessor:
             self.lighting_center = (0, 0)
 
         # direct light + surrounding color
-        _, self.color_light = cv2.threshold(self.gray_img, 180, 255, cv2.THRESH_BINARY)
+        _, self.color_light = cv2.threshold(self.gray_img, 150, 255, cv2.THRESH_BINARY)
 
         self.surrounding_pixels = self._get_surrounding_pixels_but_not_direct_light(self.direct_light, self.color_light)
         self.avg_bgr = self._calculate_avg_color_of_surroundings(self.surrounding_pixels)

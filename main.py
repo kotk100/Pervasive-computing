@@ -28,7 +28,10 @@ from TobiiProGlasses2_PyCtrl.tobiiglassesctrl.tobiiglassesctrl import TobiiGlass
 
 NUMBER_FRAMES_BLINK = 7
 NUMBER_OF_LIGHTS = 2
-LIGHT_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+LIGHT_COLORS = [[0, 0, 255], [0, 255, 0], [255, 0, 0]]
+LIGHT_NAME = ["blue", "green", "red"]
+DEBUG = False
+BLINK_CONTR_DURATION = 0.4
 
 # Turn all lights off
 for light in range(NUMBER_OF_LIGHTS):
@@ -102,90 +105,182 @@ for light in range(NUMBER_OF_LIGHTS):
 counter = 0
 while (cap.isOpened()):
 	# Capture frame-by-frame
-	ret, frame = cap.read()
+	cap.grab()
 
-	if ret == True:
+	try:
+		blink = detected_blinks.get_nowait()
+		data_gp = blink['gp']
 
-		# Get any blinks that were detected between the frames, only keep the last one
-		while True:
-			try:
-				blink = detected_blinks.get_nowait()
-				# Number of frames to display the blink
-				blink_display_frames = NUMBER_FRAMES_BLINK
-			except Empty:
-				break
+		if blink['eye'] == 'right' and blink['duration'] > BLINK_CONTR_DURATION:
+			print("Detecting light bulb...")
+			for light in range(NUMBER_OF_LIGHTS):
+				hue.saveLightState(light)
+				hue.setLightState(light, True)
+				hue.setColor(light, LIGHT_COLORS[light])
+				hue.setBrightness(light, 155)
 
-		height, width = frame.shape[:2]
+			before = time.time()
+			while time.time() - before < 1.0:
+				cap.grab()
 
-		# Get blink gaze point if detected and process blink
-		if ('blink' in locals()) and (blink_display_frames == NUMBER_FRAMES_BLINK):
-			data_gp = blink['gp']
+			ret, frame = cap.read()
 
+			for light in range(NUMBER_OF_LIGHTS):
+				hue.loadLightState(light)
 
-			if blink['eye'] == 'right':
-				for light in range(NUMBER_OF_LIGHTS):
-					hue.setColor(light, LIGHT_COLORS[light])
-					hue.setBrightness(light, 255)
+			height, width = frame.shape[:2]
+			x = int(data_gp[0] * width)
+			y = int(data_gp[1] * height)
 
-				before = time.time()
-				while time.time() - before < 0.5:
-					ret, frame = cap.read()
-
-				x = int(data_gp[0] * width)
-				y = int(data_gp[1] * height)
-
-				x1 = max(0, x - 150)
-				x2 = min(width, x + 150)
-				y1 = max(0, y - 150)
-				y2 = min(height, y + 150)
-				light = frame[y1:y2, x1:x2]
+			x1 = max(0, x - 150)
+			x2 = min(width, x + 150)
+			y1 = max(0, y - 150)
+			y2 = min(height, y + 150)
+			light = frame[y1:y2, x1:x2]
+			if DEBUG:
 				cv2.imshow(str(counter), light)
-				#cv2.imwrite("ColorRecognition/TestImages/" + str(counter) + ".jpg", light)
-				image = getColorFromImage.ImageProcessor(light)
-				value = image.get_avg_pixel_color()
-				if value[0] == [0, 0, 0]:
-					continue
-				print(value)
-				cv2.rectangle(light, (0, 0), (30, 30), tuple([int(x) for x in value[0]]), -1)
-				cv2.imshow(str(counter), light)
-				counter += 1
+			#cv2.imwrite("ColorRecognition/TestImages/" + str(counter) + ".jpg", light)
+			image = getColorFromImage.ImageProcessor(light)
+			value = image.get_avg_pixel_color()
+			print(value)
 
-				for light in range(NUMBER_OF_LIGHTS):
-					hue.setColor(light, [255, 255, 255])
-					hue.setBrightness(light, 100)
-		else:
-			data_gp = tobiiglasses.get_data()['gp']['gp']
-		data_pts = tobiiglasses.get_data()['pts']  # TODO not receiving PTS sync packets for some reason
-		#offset = data_gp['ts'] / 1000000.0 - data_pts['ts'] / 1000000.0  # offset in ms
+			cv2.rectangle(light, (0, 0), (30, 30), tuple([int(x) for x in value[0]]), -1)
+			cv2.imwrite("./Test/" + str(counter) + ".jpg", light)
+			counter += 1
 
-		# Seconds after video start, used for sync
-		pst = cap.get(cv2.CAP_PROP_POS_MSEC)
-		# print(offset)
+			if value[0] == [0, 0, 0]:
+				continue
 
-		# if offset > 0.0 and offset <= frame_duration:
-		# Display detected blinks by filling the appropriate part of circle for blink_display_frames number of frames
-		if 'blink' in locals():
-			if blink['eye'] == 'both':
-				cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), -1)
-			elif blink['eye'] == 'left':
-				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, 90, 270, (0, 0, 255), -1)
-			elif blink['eye'] == 'right':
-				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, -90, 90, (0, 0, 255), -1)
-			blink_display_frames -= 1
-			if blink_display_frames < 1:
-				del blink
+			selected_light = 0
+			for c in LIGHT_NAME:
+				if c == value[1]:
+					break;
+				selected_light += 1
 
-		cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), 2)
-		# Display the resulting frame
-		cv2.imshow('Tobii Pro Glasses 2 - Live Scene', frame)
+			if selected_light < NUMBER_OF_LIGHTS:
+				print("Selected light: " + value[1])
+				# Wait for next blink to occur in 1 seconds
+				while True:
+					try:
+						cont_blink = detected_blinks.get_nowait()
 
-		# Press Q on keyboard to  exit
-		if cv2.waitKey(1) & 0xFF == ord('q'):
-			break
+						if cont_blink["eye"] == "both":
+							hue.toggleLightState(selected_light)
+						elif cont_blink["eye"] == "right":
+							hue.loopBrightness(selected_light)
+						elif cont_blink["eye"] == "left" and cont_blink['duration'] < BLINK_CONTR_DURATION:
+							hue.loopColor(selected_light)
+						else:
+							print("Controlling " + value[1] + " bulb done.")
+							break
 
-	# Break the loop
-	else:
-		break
+					except Empty:
+						pass
+	except Empty:
+		pass
+
+
+
+	# 	# Get blink gaze point if detected and process blink
+	# 	if ('blink' in locals()) and  ((not DEBUG) or (blink_display_frames == NUMBER_FRAMES_BLINK)):
+	# 		data_gp = blink['gp']
+	#
+	# 		if blink['eye'] == 'right':
+	# 			print("Detecting light bulb...")
+	# 			for light in range(NUMBER_OF_LIGHTS):
+	# 				hue.saveLightState(light)
+	# 				hue.setLightState(light, True)
+	# 				hue.setColor(light, LIGHT_COLORS[light])
+	# 				hue.setBrightness(light, 155)
+	#
+	# 			before = time.time()
+	# 			while time.time() - before < 0.5:
+	# 				ret, frame = cap.read()
+	#
+	# 			for light in range(NUMBER_OF_LIGHTS):
+	# 				hue.loadLightState(light)
+	#
+	# 			x = int(data_gp[0] * width)
+	# 			y = int(data_gp[1] * height)
+	#
+	# 			x1 = max(0, x - 150)
+	# 			x2 = min(width, x + 150)
+	# 			y1 = max(0, y - 150)
+	# 			y2 = min(height, y + 150)
+	# 			light = frame[y1:y2, x1:x2]
+	# 			if DEBUG:
+	# 				cv2.imshow(str(counter), light)
+	# 			#cv2.imwrite("ColorRecognition/TestImages/" + str(counter) + ".jpg", light)
+	# 			image = getColorFromImage.ImageProcessor(light)
+	# 			value = image.get_avg_pixel_color()
+	# 			print(value)
+	#
+	# 			if value[0] == [0, 0, 0]:
+	# 				continue
+	#
+	#
+	# 			if DEBUG:
+	# 				print(value)
+	# 				cv2.rectangle(light, (0, 0), (30, 30), tuple([int(x) for x in value[0]]), -1)
+	# 				cv2.imshow(str(counter), light)
+	# 				counter += 1
+	#
+	# 			selected_light = 0
+	# 			for c in LIGHT_NAME:
+	# 				if c == value[1]:
+	# 					break;
+	# 				selected_light += 1
+	#
+	# 			if selected_light < NUMBER_OF_LIGHTS:
+	# 				print("Selected light: " + value[1])
+	# 				# Wait for next blink to occur in 2 seconds
+	# 				while True:
+	# 					try:
+	# 						cont_blink = detected_blinks.get(True, 2.0)
+	#
+	# 						if cont_blink["eye"] == "both":
+	# 							hue.toggleLightState(selected_light)
+	# 						elif cont_blink["eye"] == "right":
+	# 							hue.incBrightness(selected_light)
+	# 						elif cont_blink["eye"] == "left":
+	# 							hue.decBrightness(selected_light)
+	# 					except Empty:
+	# 						print("Controlling " + value[1] + " bulb done.")
+	# 						break
+	#
+	# 	else:
+	# 		data_gp = tobiiglasses.get_data()['gp']['gp']
+	#
+	# 	#data_pts = tobiiglasses.get_data()['pts']  # TODO not receiving PTS sync packets for some reason
+	#
+	# 	# Seconds after video start, used for sync
+	# 	#pst = cap.get(cv2.CAP_PROP_POS_MSEC)
+	#
+	# 	# if offset > 0.0 and offset <= frame_duration:
+	# 	# Display detected blinks by filling the appropriate part of circle for blink_display_frames number of frames
+	# 	if DEBUG == True:
+	# 		if 'blink' in locals():
+	# 			if blink['eye'] == 'both':
+	# 				cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), -1)
+	# 			elif blink['eye'] == 'left':
+	# 				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, 90, 270, (0, 0, 255), -1)
+	# 			elif blink['eye'] == 'right':
+	# 				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, -90, 90, (0, 0, 255), -1)
+	# 			blink_display_frames -= 1
+	# 			if blink_display_frames < 1:
+	# 				del blink
+	#
+	# 		cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), 2)
+	# 		# Display the resulting frame
+	# 		cv2.imshow('Tobii Pro Glasses 2 - Live Scene', frame)
+	#
+	# 		# Press Q on keyboard to  exit
+	# 		if cv2.waitKey(1) & 0xFF == ord('q'):
+	# 			break
+	#
+	# # Break the loop
+	#else:
+	#	break
 
 # When everything done, release the video capture object
 cap.release()

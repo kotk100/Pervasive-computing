@@ -540,6 +540,7 @@ class TobiiGlassesController():
 			if diff_last > 0.06:
 				# Get the estimated gp from last 2 measurements before blink
 				jsondata['gp'] = [(self.tracking_queue['gp'][1]['gp'][0] + self.tracking_queue['gp'][2]['gp'][0])/2, (self.tracking_queue['gp'][1]['gp'][1] + self.tracking_queue['gp'][2]['gp'][1])/2]
+				jsondata['duration'] = diff_last
 				# Send blink detection to other thread for processing
 				self.blink_queue.put(jsondata)
 		except:
@@ -552,6 +553,7 @@ class TobiiGlassesController():
 			val = self.blink_queue.get()
 			last_blink_eye = val['eye']
 			gp = val['gp']
+			duration = val['duration']
 			#print("blink detected in %s eye at %d" % (last_blink_eye, val['ts']))
 
 			try:
@@ -561,11 +563,11 @@ class TobiiGlassesController():
 				# if a blink is detected that close to another check if it's from a different eye and consider it as blinking with both eyes
 				# The timeout value provides a tradeoff between fast response when blinking with one eye and amount of errors when using both (seperate detections)
 				if ((last_blink_eye == 'right') & (val['eye'] == 'left')) | ((last_blink_eye == 'left') & (val['eye'] == 'right')):
-					self.blink_filtered.put({'eye': 'both', 'gp': gp})
+					self.blink_filtered.put({'eye': 'both', 'gp': gp, 'duration': duration})
 					print("Blink detected in both eyes")
 				else:
 					print("Error-ish, shouldn't happen in real-world, do you have super powers and can blink really fast?")
 			except Empty:
 				# If no other blink is reveived in the 40ms output the detected blink as just a single eye blink
-				self.blink_filtered.put({'eye': last_blink_eye, 'gp': gp})
+				self.blink_filtered.put({'eye': last_blink_eye, 'gp': gp, 'duration': duration})
 				print("Blink detected in %s eye" % last_blink_eye)

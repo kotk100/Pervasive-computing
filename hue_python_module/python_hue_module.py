@@ -2,7 +2,8 @@ from hue_python_module.phue import Bridge
 from rgbxy import Converter
 import random
 
-b = Bridge("192.168.1.33")  # Enter bridge IP here. Change depending on local bridge IP.
+
+b = Bridge("192.168.1.36")  # Enter bridge IP here. Change depending on local bridge IP.
 conv = Converter()
 
 keyColors = {}
@@ -12,12 +13,47 @@ keyColors = {}
 lights = b.get_light_objects()
 print(lights)
 
+light_states = {}
+
+def saveLightState(id):
+    light_states[id] = {}
+    light_states[id]["state"] = lights[id].on
+    light_states[id]["brightness"] = lights[id].brightness
+    light_states[id]["color"] = lights[id].xy
+
+def loadLightState(id):
+    lights[id].on = light_states[id]["state"]
+    lights[id].brightness = light_states[id]["brightness"]
+    lights[id].xy = light_states[id]["color"]
+
 def setLightState(id, state):       # True=on, False=off
     lights[id].on = state
 
+def toggleLightState(id):
+    lights[id].on = not lights[id].on
 
 def setBrightness(id, brightness):      # Range 0-254
   lights[id].brightness = brightness
+
+def loopBrightness(id):
+    if lights[id].brightness <= 253:
+        br = lights[id].brightness + 25
+        if br > 254:
+            br = 254
+        print(br)
+        lights[id].brightness = br
+    else:
+        lights[id].brightness = 10
+
+def loopColor(id):
+    if lights[id].hue <= 65534:
+        br = lights[id].hue + 3000
+        if br > 65535:
+            br = 65535
+        print(br)
+        lights[id].hue = br
+    else:
+        lights[id].hue = 1
 
 def incBrightness(id):
     if lights[id].brightness <= 229:
@@ -27,13 +63,13 @@ def incBrightness(id):
 
 def decBrightness(id):
     if lights[id].brightness >= 25:
-        lights[id].brightness += 25
+        lights[id].brightness -= 25
     else:
         print("Brightness is already set to minimum")
 
 
 def setColor(id, rgb):
-    lights[id].transitiontime = 0
+    #lights[id].transitiontime = 0
     lights[id].xy = conv.rgb_to_xy(rgb[0], rgb[1], rgb[2])
 
 def setRed(id):

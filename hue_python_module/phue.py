@@ -31,6 +31,7 @@ else:
     import httplib
 
 logger = logging.getLogger('phue')
+logger.setLevel('INFO')
 
 
 if platform.system() == 'Windows':
