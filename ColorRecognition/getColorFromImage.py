@@ -6,8 +6,8 @@ import math
 
 class ImageProcessor:
     def __init__(self, image_path):
-        self.img = cv2.imread(image_path)
-        #self.img = image_path
+        #self.img = cv2.imread(image_path)
+        self.img = image_path
         self.gray_img = cv2.cvtColor(self.img, cv2.COLOR_BGR2GRAY)
 
         # pixels that have lower value than 245 turns into black, others to white (higher number -> smaller area)
@@ -65,7 +65,7 @@ class ImageProcessor:
 
     def get_avg_pixel_color(self):
         rgb = [self.avg_bgr[2], self.avg_bgr[1], self.avg_bgr[0]]
-        return rgb, self.classify_rgb(rgb)
+        return self.avg_bgr, self.classify_rgb(rgb)
 
     def classify_rgb(self, rgb):
         colors = {

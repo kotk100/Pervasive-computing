@@ -22,7 +22,17 @@ import time
 from queue import Queue
 from queue import Empty
 from ColorRecognition import getColorFromImage
+
+import hue_python_module.python_hue_module as hue
 from TobiiProGlasses2_PyCtrl.tobiiglassesctrl.tobiiglassesctrl import TobiiGlassesController
+
+NUMBER_FRAMES_BLINK = 7
+NUMBER_OF_LIGHTS = 2
+LIGHT_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+
+# Turn all lights off
+for light in range(NUMBER_OF_LIGHTS):
+	hue.setLightState(light, False)
 
 # Create queue for receiving detected blinks
 detected_blinks = Queue()
@@ -81,26 +91,68 @@ if (cap.isOpened() == False):
 # tobiiglasses.start_recording(recording_id)
 # tobiiglasses.send_event("start_recording", "Start of the recording ")
 
+
+# Turn all lights on
+for light in range(NUMBER_OF_LIGHTS):
+	hue.setLightState(light, True)
+	hue.setBrightness(light, 100)
+	hue.setColor(light, [255, 255, 255])
+
 # Read until video is completed
 counter = 0
 while (cap.isOpened()):
 	# Capture frame-by-frame
 	ret, frame = cap.read()
 
-	# Get any blinks that were detected between the frames, only keep the last one
-	while True:
-		try:
-			blink = detected_blinks.get_nowait()
-			# Number of frames to display the blink
-			blink_display_frames = 1
-		except Empty:
-			break
-
 	if ret == True:
 
+		# Get any blinks that were detected between the frames, only keep the last one
+		while True:
+			try:
+				blink = detected_blinks.get_nowait()
+				# Number of frames to display the blink
+				blink_display_frames = NUMBER_FRAMES_BLINK
+			except Empty:
+				break
+
 		height, width = frame.shape[:2]
-		if 'blink' in locals():
+
+		# Get blink gaze point if detected and process blink
+		if ('blink' in locals()) and (blink_display_frames == NUMBER_FRAMES_BLINK):
 			data_gp = blink['gp']
+
+
+			if blink['eye'] == 'right':
+				for light in range(NUMBER_OF_LIGHTS):
+					hue.setColor(light, LIGHT_COLORS[light])
+					hue.setBrightness(light, 255)
+
+				before = time.time()
+				while time.time() - before < 0.5:
+					ret, frame = cap.read()
+
+				x = int(data_gp[0] * width)
+				y = int(data_gp[1] * height)
+
+				x1 = max(0, x - 150)
+				x2 = min(width, x + 150)
+				y1 = max(0, y - 150)
+				y2 = min(height, y + 150)
+				light = frame[y1:y2, x1:x2]
+				cv2.imshow(str(counter), light)
+				#cv2.imwrite("ColorRecognition/TestImages/" + str(counter) + ".jpg", light)
+				image = getColorFromImage.ImageProcessor(light)
+				value = image.get_avg_pixel_color()
+				if value[0] == [0, 0, 0]:
+					continue
+				print(value)
+				cv2.rectangle(light, (0, 0), (30, 30), tuple([int(x) for x in value[0]]), -1)
+				cv2.imshow(str(counter), light)
+				counter += 1
+
+				for light in range(NUMBER_OF_LIGHTS):
+					hue.setColor(light, [255, 255, 255])
+					hue.setBrightness(light, 100)
 		else:
 			data_gp = tobiiglasses.get_data()['gp']['gp']
 		data_pts = tobiiglasses.get_data()['pts']  # TODO not receiving PTS sync packets for some reason
@@ -112,22 +164,10 @@ while (cap.isOpened()):
 
 		# if offset > 0.0 and offset <= frame_duration:
 		# Display detected blinks by filling the appropriate part of circle for blink_display_frames number of frames
-		x = int(data_gp[0] * width)
-		y = int(data_gp[1] * height)
 		if 'blink' in locals():
 			if blink['eye'] == 'both':
 				cv2.circle(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), 30, (0, 0, 255), -1)
 			elif blink['eye'] == 'left':
-				x1 = max(0, x-150)
-				x2 = min(width, x +150)
-				y1 = max(0, y-150)
-				y2 = min(height, y+150)
-				light = frame[y1:y2, x1:x2]
-				cv2.imshow(str(counter), light)
-				cv2.imwrite("ColorRecognition/TestImages/" + str(counter)+".jpg", light)
-				image = getColorFromImage.ImageProcessor(light)
-				print(image.get_avg_pixel_color())
-				counter += 1
 				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, 90, 270, (0, 0, 255), -1)
 			elif blink['eye'] == 'right':
 				cv2.ellipse(frame, (int(data_gp[0] * width), int(data_gp[1] * height)), (30, 30), 0, -90, 90, (0, 0, 255), -1)
@@ -142,7 +182,6 @@ while (cap.isOpened()):
 		# Press Q on keyboard to  exit
 		if cv2.waitKey(1) & 0xFF == ord('q'):
 			break
-
 
 	# Break the loop
 	else:

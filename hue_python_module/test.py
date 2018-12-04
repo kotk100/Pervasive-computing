@@ -1,4 +1,4 @@
-import python_hue_module
+import hue_python_module.python_hue_module as python_hue_module
 import time
 
 t = python_hue_module
@@ -11,4 +11,6 @@ time.sleep(2)
 t.setBlue(0)
 time.sleep(2)
 t.setLightState(0, False)
+
+
 

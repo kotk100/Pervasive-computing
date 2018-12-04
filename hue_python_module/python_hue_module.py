@@ -1,17 +1,19 @@
-from phue import Bridge
+from hue_python_module.phue import Bridge
+from rgbxy import Converter
 import random
 
 b = Bridge("192.168.1.33")  # Enter bridge IP here. Change depending on local bridge IP.
+conv = Converter()
 
 keyColors = {}
 # If running for the first time, press button on bridge and run with b.connect() uncommented
 # b.connect()
 
 lights = b.get_light_objects()
-
+print(lights)
 
 def setLightState(id, state):       # True=on, False=off
-  lights[id].on = state
+    lights[id].on = state
 
 
 def setBrightness(id, brightness):      # Range 0-254
@@ -30,17 +32,18 @@ def decBrightness(id):
         print("Brightness is already set to minimum")
 
 
-def setColor(id, x, y):                 # Range x: 0.0-1.0, y: 0.0-1.0
-  lights[id].xy = [x, y]
+def setColor(id, rgb):
+    lights[id].transitiontime = 0
+    lights[id].xy = conv.rgb_to_xy(rgb[0], rgb[1], rgb[2])
 
 def setRed(id):
-   lights[id].xy = [0.7, 0.27]
+    lights[id].xy = [0.7, 0.27]
 
 def setGreen(id):
-   lights[id].xy = [0.38, 0.48]
+    lights[id].xy = [0.38, 0.48]
 
 def setBlue(id):
-   lights[id].xy = [0.17, 0.02]
+    lights[id].xy = [0.17, 0.02]
 
 #def changeAll():
 #  for light in lights:
