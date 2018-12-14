@@ -3,7 +3,7 @@ from rgbxy import Converter
 import random
 
 
-b = Bridge("192.168.1.36")  # Enter bridge IP here. Change depending on local bridge IP.
+b = Bridge("192.168.1.151")  # Enter bridge IP here. Change depending on local bridge IP.
 conv = Converter()
 
 keyColors = {}
@@ -40,7 +40,6 @@ def loopBrightness(id):
         br = lights[id].brightness + 25
         if br > 254:
             br = 254
-        print(br)
         lights[id].brightness = br
     else:
         lights[id].brightness = 10
@@ -50,7 +49,6 @@ def loopColor(id):
         br = lights[id].hue + 3000
         if br > 65535:
             br = 65535
-        print(br)
         lights[id].hue = br
     else:
         lights[id].hue = 1

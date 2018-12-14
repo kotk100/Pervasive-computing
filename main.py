@@ -27,7 +27,7 @@ import hue_python_module.python_hue_module as hue
 from TobiiProGlasses2_PyCtrl.tobiiglassesctrl.tobiiglassesctrl import TobiiGlassesController
 
 NUMBER_FRAMES_BLINK = 7
-NUMBER_OF_LIGHTS = 2
+NUMBER_OF_LIGHTS = 3
 LIGHT_COLORS = [[0, 0, 255], [0, 255, 0], [255, 0, 0]]
 LIGHT_NAME = ["blue", "green", "red"]
 DEBUG = False
@@ -88,13 +88,6 @@ cap = cv2.VideoCapture("rtsp://%s:8554/live/scene" % tobiiglasses.get_address())
 if (cap.isOpened() == False):
 	print("Error opening video stream or file")
 
-# Need to start a recording if we want to recieve pts packets to be able to sync tracking data with video
-# recording_id = tobiiglasses.create_recording(participant_id)
-# print("Important! The recording will be stored in the SD folder projects/%s/recordings/%s" % (project_id, recording_id))
-# tobiiglasses.start_recording(recording_id)
-# tobiiglasses.send_event("start_recording", "Start of the recording ")
-
-
 # Turn all lights on
 for light in range(NUMBER_OF_LIGHTS):
 	hue.setLightState(light, True)
@@ -104,7 +97,7 @@ for light in range(NUMBER_OF_LIGHTS):
 # Read until video is completed
 counter = 0
 while (cap.isOpened()):
-	# Capture frame-by-frame
+	# Capture frame-by-frame, don't decode the frame to save on time
 	cap.grab()
 
 	try:
