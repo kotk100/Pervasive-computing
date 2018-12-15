@@ -45,7 +45,7 @@ html {
 .welcome-section {
     height: 100%;
     padding-top: 150px;
-    text-align: center;
+    text-align: left;
     background: #fff;
 }
 .status-section {
@@ -54,10 +54,14 @@ html {
     text-align: center;
     background: #EFDECD;
 }
+.features {
+	text-align: left;
+	margin-left: 32%;
+}
 .about-section {
     height: 100%;
     padding-top: 100px;
-    text-align: center;
+    text-align: left;
     background: #fff;
 }
 .useful-section {
