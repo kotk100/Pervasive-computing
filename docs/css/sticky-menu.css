@@ -48,15 +48,27 @@ html {
     text-align: center;
     background: #fff;
 }
+.status-section {
+	height: 100%;
+    padding-top: 100px;
+    text-align: center;
+    background: #EFDECD;
+}
 .about-section {
     height: 100%;
-    padding-top: 150px;
+    padding-top: 100px;
+    text-align: center;
+    background: #fff;
+}
+.useful-section {
+	height: 100%;
+    padding-top: 100px;
     text-align: center;
     background: #EFDECD;
 }
 .contact-section {
     height: 100%;
-    padding-top: 150px;
+    padding-top: 100px;
     text-align: center;
     background: #fff;
 }
